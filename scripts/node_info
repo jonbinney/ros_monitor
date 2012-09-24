@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('ros_monitor')
+
+from ros_monitor.node_info import NodeInfo
+
+ni = NodeInfo()
+print ni.get_nodes()
