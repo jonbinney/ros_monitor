@@ -1,0 +1,9 @@
+<package>
+  <description brief="ros_monitor">
+  </description>
+  <author>Jon Binney</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/ros_monitor</url>
+
+</package>

@@ -1,0 +1,3 @@
+string remote_host
+int32 remote_port
+int32 bytes_per_second

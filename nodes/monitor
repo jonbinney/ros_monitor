@@ -1,41 +1,52 @@
 #!/usr/bin/env python
-import sys, re
+import roslib; roslib.load_manifest('ros_monitor')
+import sys, time
+import rospy
 
-def get_column_data(lines):
-   '''
-    Parse the column format used by /proc and return a list of dicts,
-    one dictionary for each line. Dictionary keys are the column headers,
-    which are int the first line.
-    '''
-    column_names = lines[0].split()
-    line_dicts = []
-    for line in lines[1:]:
-        fields = line.split(' ')
-        yield {column_names[col_i]: fields[col_i] for col_i in range(len(column_names))}
+from ros_monitor.node_info import NodeInfo
+from ros_monitor.process_info import ProcessInfo
+from ros_monitor.msg import Stats, NodeStats, ConnectionStats
 
-def parse_proc_ip_port(proc_str):
-    '''
-    /proc/net/tcp uses a different format to represent ip and port:
-    
-    http://linuxdevcenter.com/pub/a/linux/2000/11/16/LinuxAdmin.html?page=2
-    '''
-    if proc_str == '':
-        return None
-        
-    proc_ip_str, proc_port_str = proc_str.strip().split(':')
-    ip_ints = [int(proc_ip_str[ii:ii+2], 16) for ii in range(0, len(proc_ip_str), 2)][::-1]
-    if proc_port_str == '':
-        # sometimes the port string is empty
-        return '.'.join('%d' % x for x in ip_ints)
-    else:
-        port_int = int(proc_port_str, 16)
-        return '.'.join('%d' % x for x in ip_ints) + ':%d' % port_int
-    
-def parse_tcp_data(line_in):
-    return {'rem_address':parse_proc_ip_port(line_in['rem_address'])}
+class RosMonitor:
+   def __init__(self):
+      self.ni = NodeInfo()
+      self.pi = ProcessInfo()
+      self.stat_pub = rospy.Publisher('/ros_monitor/stats', Stats)
 
-filename = '/proc/net/tcp'
-lines = get_column_data(open(filename).readlines())
-for line in lines:
-    print parse_tcp_data(line)
+   def run(self):
+      update_rate = rospy.Rate(1.0)
+      while not rospy.is_shutdown():
+         self.run_once()
+         update_rate.sleep()
+      
+   def run_once(self):
+      stats_msg = Stats()
+      stats_msg.header.stamp = rospy.Time.now()
+      
+      nodes = self.ni.get_nodes()
+      pids = [nodes[node_name]['pid'] for node_name in nodes.keys()]
+      process_info = self.pi.get_stats(pids)
+      
+      pids = []
+      for node_name in nodes:
+         node_stats_msg = NodeStats()
+         node_stats_msg.node_name = node_name
+         node_dict = nodes[node_name]
+         pid = node_dict['pid']
+
+         node_stats_msg.pcpu = process_info[pid]['pcpu']
+         node_stats_msg.vsz = process_info[pid]['vsz']
+
+         print '%20s (%d): %5.1f %d' % (node_name[:18], pid, process_info[pid]['pcpu'], process_info[pid]['vsz'])
+
+         stats_msg.node_stats.append(node_stats_msg)
+         
+      self.stat_pub.publish(stats_msg)
+
+if __name__ == '__main__':
+   rospy.init_node('ros_monitor', anonymous=True)
+   
+   rm = RosMonitor()
+   rm.run()
+   
 
