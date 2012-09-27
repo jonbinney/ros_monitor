@@ -32,19 +32,25 @@ stats_sub = rospy.Subscriber('/ros_monitor/ros_graph_stats', RosGraphStats, mess
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-x = np.arange(0, 2*np.pi, 0.01)        # x-array
-line, = ax.plot(x, np.sin(x))
+
+graph_lines = {}
 
 def animate(i):
-    with graph_data_lock:
-    line.set_ydata(np.sin(x+i/10.0))  # update the data
-    return line,
+    global graph_lines, ax
+
+    x = np.arange(0, 2*np.pi, 0.01)
+    line_data = np.sin(x+i/10.0)
+    if 'line' in graph_lines:
+        graph_lines['line'].set_ydata(line_data)
+    else:
+        graph_lines['line'], = ax.plot(x, line_data)
+        
+    return graph_lines['line'],
 
 # Init only required for blitting to give a clean slate.
 def init():
-    line.set_ydata(np.ma.array(x, mask=True))
-    return line,
+    return []
 
-ani = animation.FuncAnimation(fig, animate, np.arange(1, 200), init_func=init,
+ani = animation.FuncAnimation(fig, animate, init_func=init,
                               interval=25, blit=True)
 plt.show()
