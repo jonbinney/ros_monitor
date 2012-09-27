@@ -1,4 +1,8 @@
-import subprocess, re
+import rosnode
+import xmlrpclib
+import rosgraph
+import rospy
+import re
 
 class NodeInfo:
     '''
@@ -10,10 +14,10 @@ class NodeInfo:
     topic_to_re = re.compile('to:\s+(\S+)\s+\((\S+)\)', re.DOTALL|re.MULTILINE|re.IGNORECASE)
 
     def __init__(self):
-        pass
+        self.master = rosgraph.Master(rospy.get_name())
 
     def get_node_names(self):
-        return subprocess.check_output(['rosnode', 'list']).strip().split('\n')
+        return rosnode.get_node_names()
 
     def get_node_info(self, node_name):
         '''
@@ -22,14 +26,11 @@ class NodeInfo:
         Parsing the command line output for this info seems a bit hacky, but I\'d rather
         not rely on the internal python API. -jbinney
         '''
-        info_str = subprocess.check_output(['rosnode', 'info', node_name])
-        info_dict = {}
         
-        m = NodeInfo.pid_re.search(info_str)
-        if m:
-            info_dict['pid'] = int(m.groups()[0])
-        else:
-            return None
+        node_api_uri = rosnode.get_api_uri(self.master, node_name)
+        node = xmlrpclib.ServerProxy(node_api_uri)
+        pid = node.getPid(rospy.get_name())
+        
 
         info_dict['connections'] = []
         topic_list = NodeInfo.topic_re.findall(info_str)
