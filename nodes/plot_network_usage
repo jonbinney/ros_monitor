@@ -1,18 +1,50 @@
 #!/usr/bin/env python
 PACKAGE_NAME = 'ros_monitor'
 import roslib; roslib.load_manifest(PACKAGE_NAME)
+import threading
 import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+import matplotlib.animation as animation
 import rospy
+
+from ros_monitor.msg import RosGraphStats
+
+
+# graph_data has keys (publisher_ip, publisher_port), and values {'total_bytes':[...], 'topic_name':[...]}
+graph_data = {}
+graph_data_lock = threading.Lock()
+
+def message_callback(msg):
+    global graph_data, graph_data_lock
+    rospy.loginfo('Got message')
+    with graph_data_lock:
+        for connection in msg.connections:
+            key = (connection.publisher_ip, connection.publisher_port)
+            if not key in graph_data:
+                graph_data[key] = {'total_bytes':[], 'topic_name':connection.topic_name}
+            graph_data[key]['total_bytes'].append(connection.total_bytes)
+        
 
 rospy.init_node('network_usage_plotter', anonymous=True)
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
+stats_sub = rospy.Subscriber('/ros_monitor/ros_graph_stats', RosGraphStats, message_callback)
 
-loop_rate = rospy.Rate(5.0)
-while not rospy.is_shutdown():
-    ax.plot(np.random.random(10))
-    loop_rate.sleep()
-    
+fig = plt.figure()
+ax = fig.add_subplot(111)
+x = np.arange(0, 2*np.pi, 0.01)        # x-array
+line, = ax.plot(x, np.sin(x))
+
+def animate(i):
+    with graph_data_lock:
+    line.set_ydata(np.sin(x+i/10.0))  # update the data
+    return line,
+
+# Init only required for blitting to give a clean slate.
+def init():
+    line.set_ydata(np.ma.array(x, mask=True))
+    return line,
+
+ani = animation.FuncAnimation(fig, animate, np.arange(1, 200), init_func=init,
+                              interval=25, blit=True)
+plt.show()

@@ -2,3 +2,4 @@ msg_gen
 build
 *.pyc
 src/ros_monitor/msg
+.#*
