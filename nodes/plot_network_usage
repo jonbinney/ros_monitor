@@ -1,0 +1,18 @@
+#!/usr/bin/env python
+PACKAGE_NAME = 'ros_monitor'
+import roslib; roslib.load_manifest(PACKAGE_NAME)
+import numpy as np
+import matplotlib as mpl
+from matplotlib import pyplot as plt
+import rospy
+
+rospy.init_node('network_usage_plotter', anonymous=True)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+
+loop_rate = rospy.Rate(5.0)
+while not rospy.is_shutdown():
+    ax.plot(np.random.random(10))
+    loop_rate.sleep()
+    
