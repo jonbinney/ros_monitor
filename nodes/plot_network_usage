@@ -10,7 +10,6 @@ import rospy
 
 from ros_monitor.msg import RosGraphStats
 
-
 # graph_data has keys (publisher_ip, publisher_port), and values {'total_bytes':[...], 'topic_name':[...]}
 graph_data = {}
 graph_data_lock = threading.Lock()
@@ -22,35 +21,31 @@ def message_callback(msg):
         for connection in msg.connections:
             key = (connection.publisher_ip, connection.publisher_port)
             if not key in graph_data:
-                graph_data[key] = {'total_bytes':[], 'topic_name':connection.topic_name}
+                graph_data[key] = {'total_bytes':[], 'topic_name':connection.topic_name, 'times':[]}
             graph_data[key]['total_bytes'].append(connection.total_bytes)
+
+            # this isn't quite correct... should really compute timestamps in the monitor
+            # and include them in connection stats -jbinney
+            graph_data[key]['times'].append(rospy.Time.now().to_sec())
         
 
 rospy.init_node('network_usage_plotter', anonymous=True)
 
 stats_sub = rospy.Subscriber('/ros_monitor/ros_graph_stats', RosGraphStats, message_callback)
 
+plt.ion()
 fig = plt.figure()
 ax = fig.add_subplot(111)
 
-graph_lines = {}
+loop_rate = rospy.Rate(5)
+while not rospy.is_shutdown():
+    ax.clear()
+    with graph_data_lock:
+        for (publisher_ip, publisher_port) in graph_data.keys():
+            data = graph_data[(publisher_ip, publisher_port)]
+            ax.plot(data['times'], data['total_bytes'], label=data['topic_name'])
+    ax.legend()            
+    plt.draw()
+    loop_rate.sleep()
 
-def animate(i):
-    global graph_lines, ax
-
-    x = np.arange(0, 2*np.pi, 0.01)
-    line_data = np.sin(x+i/10.0)
-    if 'line' in graph_lines:
-        graph_lines['line'].set_ydata(line_data)
-    else:
-        graph_lines['line'], = ax.plot(x, line_data)
-        
-    return graph_lines['line'],
-
-# Init only required for blitting to give a clean slate.
-def init():
-    return []
-
-ani = animation.FuncAnimation(fig, animate, init_func=init,
-                              interval=25, blit=True)
-plt.show()
+plt.ioff()
