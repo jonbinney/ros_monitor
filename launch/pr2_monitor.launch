@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="ros_monitor" type="network_monitor" name="ros_network_monitor">
+    <param name="network_interfaces" value="lo tun9"/>
+  </node>
+</launch>
