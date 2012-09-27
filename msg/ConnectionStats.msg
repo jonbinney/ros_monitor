@@ -1,3 +1,6 @@
-string remote_host
-int32 remote_port
-int32 bytes_per_second
+string topic_name
+string publisher_ip
+int32 publisher_port
+string subscriber_ip
+string subscriber_node_name
+int64 total_bytes

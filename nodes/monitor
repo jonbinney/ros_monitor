@@ -24,20 +24,29 @@ class RosMonitor:
       stats_msg.header.stamp = rospy.Time.now()
       
       nodes = self.ni.get_nodes()
-      pids = [nodes[node_name]['pid'] for node_name in nodes.keys()]
-      process_info = self.pi.get_stats(pids)
-      
-      pids = []
+      process_info = self.pi.get_stats()
       for node_name in nodes:
          node_stats_msg = NodeStats()
          node_stats_msg.node_name = node_name
          node_dict = nodes[node_name]
-         pid = node_dict['pid']
 
-         node_stats_msg.pcpu = process_info[pid]['pcpu']
-         node_stats_msg.vsz = process_info[pid]['vsz']
+         try:
+            pid = node_dict['pid']
+         except:
+            rospy.logwarn('No node info for node %s' % (node_name,))
+            continue
+         
+         node_stats_msg.pid = pid
 
-         print '%20s (%d): %5.1f %d' % (node_name[:18], pid, process_info[pid]['pcpu'], process_info[pid]['vsz'])
+         try:
+            node_stats_msg.pcpu = process_info[pid]['pcpu']
+         except:
+            rospy.logwarn('No pcpu info for node %s (pid %d)' % (node_name, pid))
+
+         try:
+            node_stats_msg.vsz = process_info[pid]['vsz']
+         except:
+            rospy.logwarn('No vsz info for node %s (pid %d)' % (node_name, pid))
 
          stats_msg.node_stats.append(node_stats_msg)
          
