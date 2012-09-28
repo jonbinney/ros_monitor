@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('ros_monitor')
+import sys
+from matplotlib import pyplot as plt
+import rosbag
+
+bagfile_name = sys.argv[1]
+
+bag = rosbag.Bag(bagfile_name)
+per_conn_stats = {}
+for topic, msg, t in bag.read_messages(topics=['/ros_monitor/ros_graph_stats']):
+    for conn in msg.connections:
+        # only consider connections from one host to another
+        print conn.subscriber_ip
+        if not conn.subscriber_ip == '10.0.2.179':
+            continue
+        
+        key = conn.topic_name, conn.publisher_ip, conn.publisher_port
+        if not key in per_conn_stats:
+            per_conn_stats[key] = {'times':[], 'total_bytes':[]}
+
+        # add time
+        per_conn_stats[key]['times'].append(t.to_sec())
+
+        # add total bytes
+        per_conn_stats[key]['total_bytes'].append(conn.total_bytes/1000.)
+bag.close()
+
+# sort by total bytes
+sorted_keys = sorted(per_conn_stats.keys(), key=lambda key: -per_conn_stats[key]['total_bytes'][-1])
+
+for key in sorted_keys[:6]:
+    stats = per_conn_stats[key]
+    plt.plot(stats['times'], stats['total_bytes'], label=str(key))
+plt.legend()
+plt.xlabel('Time (s)')
+plt.ylabel('Data transfered (kB)')
+
+plt.show()
+        
+    
+
+

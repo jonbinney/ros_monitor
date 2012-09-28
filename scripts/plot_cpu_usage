@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('ros_monitor')
+import sys
+import numpy as np
+from matplotlib import pyplot as plt
+import rosbag
+
+def load_bagfile(bagfile_name):
+    bag = rosbag.Bag(bagfile_name)
+    per_node_stats = {}
+    for topic, msg, t in bag.read_messages(topics=['/ros_monitor/stats']):
+        for stats in msg.node_stats:
+            key = stats.node_name, stats.host
+            if not key in per_node_stats:
+                per_node_stats[key] = {'times':[], 'pcpu':[], 'vsz':[]}
+            per_node_stats[key]['times'].append(t.to_sec())
+            per_node_stats[key]['pcpu'].append(stats.pcpu)
+            per_node_stats[key]['vsz'].append(stats.vsz)
+    bag.close()
+
+    # convert the lists of data for each node into arrays
+    for key in per_node_stats.keys():
+        for l in per_node_stats[key].keys():
+            per_node_stats[key][l] = np.array(per_node_stats[key][l], dtype=np.float)
+    return per_node_stats
+
+def plot_pcpu(per_node_stats, max_lines=None):
+    sorted_keys = sorted(per_node_stats.keys(), key=lambda key: -per_node_stats[key]['pcpu'].mean())
+    if max_lines:
+        sorted_keys = sorted_keys[:max_lines]
+
+    plt.figure()
+    for key in sorted_keys:
+        stats = per_node_stats[key]
+        plt.plot(stats['times'], stats['pcpu'], label=str(key))
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('CPU usage (%)')
+
+def plot_vsz(per_node_stats, max_lines=None):
+    sorted_keys = sorted(per_node_stats.keys(), key=lambda key: -per_node_stats[key]['vsz'].mean())
+    if max_lines:
+        sorted_keys = sorted_keys[:max_lines]
+
+    plt.figure()
+    for key in sorted_keys:
+        stats = per_node_stats[key]
+        plt.plot(stats['times'], stats['vsz']/1e3, label=str(key))
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Memory usage (MB)')
+
