@@ -26,25 +26,36 @@ class RosSpyNode:
         self.publish_rate = 1.0
         self.spy_threads = []
 
-        self._pub = rospy.Publisher('/ros_monitor/ros_graph_stats', RosGraphStats)
+        self._pub = rospy.Publisher('ros_monitor/graph', RosGraphStats)
+
+        self.stop_requested = False
 
     def spy_on_iface(self, iface, pkt_type):
         try:
             rospy.loginfo('Capturing packets from %s' % iface)
             pc = pcap.pcap(iface, promisc=True)
             pc.setfilter('tcp')
+            pc.setnonblock()
 
-            for ts, pkt in pc:
-                if pkt_type == 'eth':
-                    self.spy.handleEthPacket(ts, pkt)
-                elif pkt_type == 'ip':
-                    self.spy.handleIpPacket(ts, pkt)
-                else:
-                    raise ValueError('Unknown packet type: %s' % pkt_type)
+            loop_rate = rospy.Rate(100)
+            while True:
+                if self.stop_requested:
+                    break
+
+                packets = pc.readpkts()
+                for ts, pkt in packets:
+                    if pkt_type == 'eth':
+                        self.spy.handleEthPacket(ts, pkt)
+                    elif pkt_type == 'ip':
+                        self.spy.handleIpPacket(ts, pkt)
+                    else:
+                        raise ValueError('Unknown packet type: %s' % pkt_type)
+                loop_rate.sleep()
         except Exception as e:
             import traceback, sys
             print dir(self.spy)
             traceback.print_exc()
+        rospy.loginfo('Spy thread for iface %s finished' % iface)
 
     def run(self):
         for iface, pkt_type in self.network_interfaces:
@@ -68,7 +79,7 @@ class RosSpyNode:
             rospy.loginfo('Publishing network stats')
             self._pub.publish(msg)
             rate.sleep()
-
+        self.stop_requested = True
 
 if __name__ == '__main__':
     rospy.init_node('spy', anonymous=True)

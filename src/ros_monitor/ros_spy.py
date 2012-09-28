@@ -32,8 +32,7 @@ class RosSpy:
         '''
         self.max_call_duration = max_call_duration
         
-        # holds xmlprc calls that we see fly by, so
-        # that we can associate them with the response that
+        # holds xmlprc calls that we see fly by, so that we can associate them with the response that
         # flies by shortly afterward. keys are (caller_ip, caller_port, callee_ip, callee_port)
         self._xmlrpc_calls = {}
 
@@ -97,14 +96,22 @@ class RosSpy:
             return copy.copy(self._known_connections)
 
     def handleXmlRpcCall(self, xmlrpc_str, ts, ip_pkt):
-        params, method_name = xmlrpclib.loads(xmlrpc_str)
+        try:
+            params, method_name = xmlrpclib.loads(xmlrpc_str)
+        except:
+            rospy.logerror('Failed to parse xmlrpc call')
+            return
         connection_key = (parse_ip(ip_pkt.src), ip_pkt.tcp.sport, parse_ip(ip_pkt.dst), ip_pkt.tcp.dport)        
         self._xmlrpc_calls[connection_key] = (ts, method_name, params)
         rospy.logdebug('Saw %s call, key: %s, params: %s' % (method_name, str(connection_key), str(params)))
             
     def handleXmlRpcResponse(self, xmlrpc_str, ts, ip_pkt):
         # the method name isn't actually in the response, so response_method name ends up set to None
-        response_params, response_method_name = xmlrpclib.loads(xmlrpc_str)
+        try:
+            response_params, response_method_name = xmlrpclib.loads(xmlrpc_str)
+        except:
+            rospy.logerror('Failed to parse xmlrpc response')
+            return
         connection_key = (parse_ip(ip_pkt.dst), ip_pkt.tcp.dport, parse_ip(ip_pkt.src), ip_pkt.tcp.sport)
         try:
             call_ts, call_method_name, call_params = self._xmlrpc_calls[connection_key]
@@ -116,7 +123,7 @@ class RosSpy:
                          Key: %s
                   Known keys: %s
               ''' % (str(response_params), response_method_name, 
-                     str(connection_key), str(self._topic_requests.keys())))
+                     str(connection_key), str(self._xmlrpc_calls.keys())))
             return
 
         if (ts - call_ts) > self.max_call_duration:

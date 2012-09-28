@@ -17,7 +17,7 @@ class RosMonitor:
          '''
       self.ni = NodeInfo()
       self.pi = ProcessInfo()
-      self.stat_pub = rospy.Publisher('/ros_monitor/stats', Stats)
+      self.stat_pub = rospy.Publisher('ros_monitor/ps', Stats)
 
       self.hosts = hosts
 
