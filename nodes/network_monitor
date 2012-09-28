@@ -50,6 +50,7 @@ class RosSpyNode:
                 connection_msg.subscriber_ip = connection['subscriber_ip']
                 connection_msg.subscriber_node_name = connection['subscriber_node_name']
                 msg.connections.append(connection_msg)
+            rospy.loginfo('Publishing network stats')
             self._pub.publish(msg)
             rate.sleep()
 
