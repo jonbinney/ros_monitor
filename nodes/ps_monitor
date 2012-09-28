@@ -8,10 +8,24 @@ from ros_monitor.process_info import ProcessInfo
 from ros_monitor.msg import Stats, NodeStats, ConnectionStats
 
 class RosMonitor:
-   def __init__(self):
+   def __init__(self, hosts={'c1': ['prn1'], 'c2': ['prn2']}):
+      '''
+      hosts - dictionary whose keys are the hostnames of all computers where we 
+         want to check CPU usage, and whose values are a list of aliases
+         for that hostname. We must be able to ssh to each host without a password,
+         so that we can run ps to check the cpu usage.
+         '''
       self.ni = NodeInfo()
       self.pi = ProcessInfo()
       self.stat_pub = rospy.Publisher('/ros_monitor/stats', Stats)
+
+      self.hosts = hosts
+
+      # construct reverse lookup dictionary for the host aliases
+      self.host_aliases = {}
+      for host in self.hosts:
+         for alias in self.hosts[host]:
+            self.host_aliases[alias] = host
 
    def run(self):
       update_rate = rospy.Rate(1.0)
@@ -24,27 +38,40 @@ class RosMonitor:
       stats_msg.header.stamp = rospy.Time.now()
       
       nodes = self.ni.get_nodes()
-      process_info = self.pi.get_stats()
-      for node_name in nodes:
+
+      self.pi.update(self.hosts.keys())
+
+      for node_name in nodes.keys():
          node_stats_msg = NodeStats()
          node_stats_msg.node_name = node_name
-         node_dict = nodes[node_name]
-
+         
          try:
-            pid = node_dict['pid']
+            node_info = nodes[node_name]
          except:
             rospy.logwarn('No node info for node %s' % (node_name,))
             continue
          
+         pid = node_info['pid']
+         host = node_info['host']
+         if host in self.host_aliases:
+            host = self.host_aliases[host]
+         
          node_stats_msg.pid = pid
+         node_stats_msg.host = host
 
          try:
-            node_stats_msg.pcpu = process_info[pid]['pcpu']
+            ps_info = self.pi.get_stats(pid, host)
+         except:
+            rospy.logwarn('No process info for node %s on host %s (pid %d)' % (node_name, host, pid))
+            continue
+
+         try:
+            node_stats_msg.pcpu = ps_info['pcpu']
          except:
             rospy.logwarn('No pcpu info for node %s (pid %d)' % (node_name, pid))
 
          try:
-            node_stats_msg.vsz = process_info[pid]['vsz']
+            node_stats_msg.vsz = ps_info['vsz']
          except:
             rospy.logwarn('No vsz info for node %s (pid %d)' % (node_name, pid))
 
