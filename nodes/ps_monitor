@@ -8,7 +8,7 @@ from ros_monitor.process_info import ProcessInfo
 from ros_monitor.msg import Stats, NodeStats, ConnectionStats
 
 class RosMonitor:
-   def __init__(self, hosts={'c1': ['prn1'], 'c2': ['prn2']}):
+   def __init__(self, hosts={'c1': ['prl1'], 'c2': ['prl2']}):
       '''
       hosts - dictionary whose keys are the hostnames of all computers where we 
          want to check CPU usage, and whose values are a list of aliases
@@ -28,7 +28,7 @@ class RosMonitor:
             self.host_aliases[alias] = host
 
    def run(self):
-      update_rate = rospy.Rate(1.0)
+      update_rate = rospy.Rate(100)
       while not rospy.is_shutdown():
          self.run_once()
          update_rate.sleep()
@@ -65,18 +65,26 @@ class RosMonitor:
             rospy.logwarn('No process info for node %s on host %s (pid %d)' % (node_name, host, pid))
             continue
 
-         try:
-            node_stats_msg.pcpu = ps_info['pcpu']
-         except:
-            rospy.logwarn('No pcpu info for node %s (pid %d)' % (node_name, pid))
-
-         try:
-            node_stats_msg.vsz = ps_info['vsz']
-         except:
-            rospy.logwarn('No vsz info for node %s (pid %d)' % (node_name, pid))
+         node_stats_msg.cputime = ps_info['cputime']
+         node_stats_msg.mtime = ps_info['mtime']
+         node_stats_msg.mem = ps_info['mem']
 
          stats_msg.node_stats.append(node_stats_msg)
-         
+
+      # HACK! also collect stats for a couple additional commands which aren't ROS nodes
+      additional_commands = set(['XnSensorServer'])
+      for host, pid in self.pi._ps_dict:
+         ps_info = self.pi._ps_dict[host, pid]
+         if ps_info['comm'] in additional_commands:
+            node_stats_msg = NodeStats()
+            node_stats_msg.node_name = '<%s>' % ps_info['comm']
+            node_stats_msg.pid = pid
+            node_stats_msg.host = host
+            node_stats_msg.cputime = ps_info['cputime']
+            node_stats_msg.mtime = ps_info['mtime']
+            node_stats_msg.mem = ps_info['mem']
+
+            stats_msg.node_stats.append(node_stats_msg)
       self.stat_pub.publish(stats_msg)
 
 if __name__ == '__main__':
