@@ -1,7 +1,16 @@
 <launch>
-  <node pkg="ros_monitor" type="network_monitor" name="ros_network_monitor">
+  <include file="$(find pr2_machine)/pr2.machine"/>
+
+  <!-- Collect network usage stats for ROS topics -->
+  <node pkg="ros_monitor" type="network_monitor" name="ros_network_monitor" machine="c1">
     <param name="network_interfaces" value="lo tun9"/>
   </node>
 
-  <node pkg="ros_monitor" type="ps_monitor" name="ros_ps_monitor"/>
+  <!-- Collect process statistics on both machines -->
+  <node pkg="ros_monitor" type="ps_monitor" name="ps_monitor_c1" machine="c1"/>
+  <node pkg="ros_monitor" type="ps_monitor" name="ps_monitor_c2" machine="c2"/>
+
+  <!-- Collect information about what nodes are running -->
+  <node pkg="ros_monitor" type="nodes_monitor" name="nodes_monitor" machine="c1"/>
+
 </launch>
