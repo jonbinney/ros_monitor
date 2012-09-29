@@ -40,6 +40,6 @@ class NodeInfo:
             try:
                 nodes[node_name] = self.get_node_info(node_name)
             except:
-                rospy.logwarn(
+                rospy.logdebug(
                     'NodeInfo.get_nodes: Unable to get node info for node: %s' % node_name)
         return nodes

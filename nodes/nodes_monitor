@@ -8,13 +8,13 @@ from ros_monitor.node_info import NodeInfo
 from ros_monitor.process_info import ProcessInfo
 from ros_monitor.msg import Node, NodeList
 
-class RosNodesMonitor:
+class NodesMonitor:
    '''
    Publishes lists of all running ROS nodes, so that this data can be recorded.
    '''
    def __init__(self):
       self.ni = NodeInfo()
-      self.nodes_pub = rospy.Publisher('ros_monitor/node_list', NodeList)
+      self.nodes_pub = rospy.Publisher('ros_monitor/nodes', NodeList)
 
    def run(self):
       update_rate = rospy.Rate(25)
@@ -45,7 +45,7 @@ class RosNodesMonitor:
 
 if __name__ == '__main__':
    rospy.init_node('nodes_monitor')
-   rnm = RosNodesMonitor()
+   rnm = NodesMonitor()
    rnm.run()
    
 
