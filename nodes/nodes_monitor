@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+PACKAGE_NAME = 'ros_monitor'
+import roslib; roslib.load_manifest(PACKAGE_NAME)
+import sys, time
+import rospy
+
+from ros_monitor.node_info import NodeInfo
+from ros_monitor.process_info import ProcessInfo
+from ros_monitor.msg import Node, NodeList
+
+class RosNodesMonitor:
+   '''
+   Publishes lists of all running ROS nodes, so that this data can be recorded.
+   '''
+   def __init__(self):
+      self.ni = NodeInfo()
+      self.nodes_pub = rospy.Publisher('ros_monitor/node_list', NodeList)
+
+   def run(self):
+      update_rate = rospy.Rate(25)
+      while not rospy.is_shutdown():
+         self.run_once()
+         update_rate.sleep()
+      
+   def run_once(self):
+      node_list_msg = NodeList()
+
+      nodes = self.ni.get_nodes()
+
+      for node_name in nodes.keys():
+         node_msg = Node()
+         node_msg.node_name = node_name
+         
+         try:
+            node_info = nodes[node_name]
+         except:
+            rospy.logwarn('No node info for node %s' % (node_name,))
+            continue
+         
+         node_msg.pid = node_info['pid']
+         node_msg.hostname = node_info['host']
+         node_msg.pid = node_info['pid']
+         node_list_msg.nodes.append(node_msg)
+      self.nodes_pub.publish(node_list_msg)
+
+if __name__ == '__main__':
+   rospy.init_node('nodes_monitor')
+   rnm = RosNodesMonitor()
+   rnm.run()
+   
+
