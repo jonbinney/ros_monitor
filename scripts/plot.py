@@ -42,6 +42,23 @@ def load_bagfile(bagfile_name, min_dt=0.0):
             process_stats[key]['cputime'].append(ps.cputime)
             process_stats[key]['vsz'].append(ps.vsz)
             process_stats[key]['comm'] = ps.comm
+
+    graph_stats = {}
+    for topic, msg, t in bag.read_messages(topics=['/ros_monitor/network']):
+        for conn in msg.connections:
+            key = conn.publisher_ip, conn.publisher_port, conn.topic_name, conn.subscriber_ip
+            if not key in graph_stats:
+                graph_stats[key] = {
+                    'topic_name': conn.topic_name,
+                    'subscriber_ip': conn.subscriber_ip,
+                    'subscriber_node_name': conn.subscriber_node_name,
+                    'total_bytes': [],
+                    'total_bytes_times': []
+                    }
+            if not graph_stats[key]['topic_name'] == conn.topic_name:
+                diiiieee
+            graph_stats[key]['total_bytes'].append(conn.total_bytes)
+            graph_stats[key]['total_bytes_times'].append(t.to_sec())
     bag.close()
 
     # convert the lists of data for each node into arrays
@@ -49,10 +66,19 @@ def load_bagfile(bagfile_name, min_dt=0.0):
         for l in process_stats[key].keys():
             if l not in ['comm', 'node_name']:
                 process_stats[key][l] = np.array(process_stats[key][l], dtype=np.float)
-    return nodes, process_stats
 
 
-monitor_nodes = ['/ros_network_monitor', 'nodes_monitor', '/ps_monitor_c1', '/ps_monitor_c2']
+    # convert ros graph stats data to arrays
+    for key in graph_stats:
+        for l in graph_stats[key]:
+            if l in ['total_bytes', 'total_bytes_times']:
+                graph_stats[key][l] = np.array(graph_stats[key][l], dtype=np.float)
+    
+                
+    return nodes, process_stats, graph_stats
+
+
+monitor_nodes = ['/ros_network_monitor', '/nodes_monitor', '/ps_monitor_c1', '/ps_monitor_c2']
 colors = ['b', 'c', 'm', 'g', 'r', 'y']
 
 def plot_cpu(nodes, process_stats, max_lines=None):
@@ -81,10 +107,7 @@ def plot_cpu(nodes, process_stats, max_lines=None):
 
     def sort_key(stats_key):
         stats = process_stats[stats_key]
-        if stats['node_name'] == '/object_manipulator':
-            # always display this one
-            return -np.inf
-        elif len(stats['cpu_usage']) > 0:
+        if len(stats['cpu_usage']) > 0:
             return -stats['cpu_usage'].mean()
         else:
             return np.inf
@@ -120,7 +143,9 @@ def plot_cpu(nodes, process_stats, max_lines=None):
         color = colors[process_i % len(colors)]
         plt.fill_between(stats['cpu_usage_time'], stats['cpu_usage'], 0, color=color)
         ymin, ymax = plt.ylim()
-        plt.ylim(0.0, ymax)
+        plt.ylim(0.0, 1.4)
+        ymin, ymax = plt.ylim()
+        plt.yticks([ymin, ymax])
         ax.set_yticks(np.linspace(0.0, ymax, 3))
 
     #plt.legend(loc='upper left', prop={'size':8})
@@ -171,3 +196,32 @@ def plot_mem(process_stats, max_lines=None):
     plt.xlabel('Time (s)')
     plt.ylabel('Memory usage (MB)')
 
+def plot_bandwidth(graph_stats):
+    for key in graph_stats:
+        stats = graph_stats[key]
+        total_bytes_times = stats['total_bytes_times']
+        total_bytes = stats['total_bytes']
+        inc_bytes = total_bytes[1:] - total_bytes[:-1]
+        inc_times = total_bytes_times[1:] - total_bytes_times[:-1]
+        bandwidth = inc_bytes / inc_times
+        stats['bandwidth_times'] = 0.5*total_bytes_times[1:] + 0.5*total_bytes_times[:-1]
+        stats['bandwidth'] = bandwidth
+
+    def sort_key(key):
+        bandwidth = graph_stats[key]['bandwidth']
+        if len(bandwidth) == 0:
+            return np.inf
+        else:
+            return -bandwidth.max()
+
+    sorted_keys = sorted(graph_stats.keys(), key=sort_key)
+    
+    fig = plt.figure()
+    for key in sorted_keys:
+        stats = graph_stats[key]
+        plt.plot(stats['bandwidth_times'], stats['bandwidth'], label=str(key))
+    plt.title('Bandwidth of ROS Topics')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Bandwidth (Bytes per Second)')
+    plt.legend(loc='upper left')
+    
